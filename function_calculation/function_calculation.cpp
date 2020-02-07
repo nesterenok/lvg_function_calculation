@@ -109,7 +109,7 @@ int main(int argc, char** argv)
 //	calc_loss_func_p(g_min = 1.e-6, g_max = 1.e+14, d_min = 1.e-2, d_max = 1.e+9, point_nb_per_order = 16);
 //	calc_loss_func_q(g_min = 1.e-6, g_max = 1.e+14, d_min = 1.e-2, d_max = 1.e+9, point_nb_per_order = 16);
     calc_line_overlap1(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., point_nb_per_order = 8, nb_dx_points = 33);
-//    calc_line_overlap2(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., point_nb_per_order = 8, nb_dx_points = 33);
+    calc_line_overlap2(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., point_nb_per_order = 8, nb_dx_points = 33);
 
 	return 0;
 }
@@ -386,30 +386,35 @@ void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, 
 
 #pragma omp parallel shared(l, k, nb_g, nb_gr, delta_arr, gamma_arr, gratio_arr, dx_arr) private(i, j, m)
             {
+                line_overlap_rect1 calc_p_rect; // for rectangular profile;
                 line_overlap_func_mu calc_p;
-                //line_profile_gauss* lprofile = new line_profile_gauss(X_RANGE_LINE_OVERLAP);
-                line_profile_rectang* lprofile = new line_profile_rectang();
-                lprofile->set_x_range(-0.5*lprofile->eq_width, 0.5 * lprofile->eq_width);
-
+                
+                line_profile_gauss* lprofile = new line_profile_gauss(X_RANGE_LINE_OVERLAP);
+                
                 line_overlap_sf1* f1 = new line_overlap_sf1();
-                line_overlap_func_x2* f2 = new line_overlap_func_x2();
+                line_overlap_func2* f2 = new line_overlap_func2();
 
                 f1->set_line_profile(lprofile);
                 f2->set_line_profile(lprofile);
                 f1->set_func(f2);
+                
                 calc_p.set_func(f1);
-
+                calc_p.set_integr_lim(lprofile->x_min, lprofile->x_max);
+                
                 double** p1 = alloc_2d_array<double>(nb_gr, nb_g);
                 memset(*p1, 0, nb_gr * nb_g * sizeof(double));
 
-#pragma omp for schedule(dynamic, 2)
+#pragma omp for schedule(dynamic, 1)
                 for (m = 0; m < nb_g * nb_gr; m++) {
                     i = m / nb_g;
                     j = m % nb_g;
-
+                    
+                    // one sided loss probability function for photon created in line processes is 0.5-0.5*K, where K is p1
                     calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
-                    // one sided loss probability function for photon created in line processes is 0.5-0.5*K, where K is:
-                    p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / (M_PI * gamma_arr[j]);
+                    //p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
+                    
+                    calc_p_rect.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                    p1[i][j] = qromb<line_overlap_rect1>(calc_p_rect, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
                 }
 #pragma omp critical
                 {
@@ -509,28 +514,36 @@ void calc_line_overlap2(double d_min, double d_max, double g_min, double g_max, 
 
 #pragma omp parallel shared(l, k, nb_g, nb_gr, delta_arr, gamma_arr, gratio_arr, dx_arr) private(i, j, m)
             {
+                line_overlap_rect2 calc_p_rect; // for rectangular profile;
                 line_overlap_func_mu calc_p;
+
                 line_profile_gauss* lprofile = new line_profile_gauss(X_RANGE_LINE_OVERLAP);
+                
                 line_overlap_sf2* f1 = new line_overlap_sf2();
-                line_overlap_func_x2* f2 = new line_overlap_func_x2();
+                line_overlap_func2* f2 = new line_overlap_func2();
 
                 f1->set_line_profile(lprofile);
                 f2->set_line_profile(lprofile);
                 f1->set_func(f2);
+
                 calc_p.set_func(f1);
+                calc_p.set_integr_lim(lprofile->x_min + dx_arr[k], lprofile->x_max + dx_arr[k]);
 
                 double** p1 = alloc_2d_array<double>(nb_gr, nb_g);
                 memset(*p1, 0, nb_gr * nb_g * sizeof(double));
 
-#pragma omp for schedule(dynamic, 2)
+#pragma omp for schedule(dynamic, 1)
                 for (m = 0; m < nb_g * nb_gr; m++) {
                     i = m / nb_g;
                     j = m % nb_g;
 
-                    calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
                     // Note!!! The correction was made - 1/g2 instead of 1./g1
                     // one sided loss probability function for photon created in line processes is 0.5-0.5*K, where K is
-                    p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / (M_PI * gamma_arr[j] * gratio_arr[i]);
+                    calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                    //p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / (gamma_arr[j] * gratio_arr[i]);
+
+                    calc_p_rect.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                    p1[i][j] = qromb<line_overlap_rect2>(calc_p_rect, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
                 }
 #pragma omp critical
                 {
