@@ -8,6 +8,7 @@ public:
     virtual double operator() (double x) = 0; // = normalized profile(x)
     virtual double integral(double x) = 0;    // = integrated normalized profile + const(arbitrary)
 
+    // gz1 = mu*mu*g1, gz2 = mu*mu*g2, b = g1/d
     virtual double approx1(double x1, double dx, double gz1, double gz2, double b) { return 0.; };
     virtual double approx2(double x1, double dx, double gz1, double gz2, double b) { return 0.; };
     

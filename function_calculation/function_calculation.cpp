@@ -3,13 +3,14 @@
 // 05.09.2017. Check for errors. 
 //		It takes about 2*24 hours to calculate all p and q integrals using 32 processors, relative accuracy 1.e-5, integration on mu is [1.e-6, 1];
 //		Calculation time strongly depends on integration limits for mu;
+// 17.03.2020. Check for errors.
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
 #endif
 
 // the values are used between 1.e-8 and 1.e-2
-// the photons with the mu < mu_min musy be taken into account
+// the photons with the mu < mu_min must be taken into account
 #define MU_MIN 1.e-6        
 #define X_RANGE_LINE_OVERLAP 10.
 
@@ -48,9 +49,9 @@ void calc_loss_func_q(double g_min, double g_max, double d_min, double d_max, in
 // line overlap,
 // g_min must be less than 1.e-2,
 void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, double gratio_min, double gratio_max, double dx_min, double dx_max, 
-    int point_nb_per_order, int nb_dx_points);
+    int point_nb_per_order, int nb_dx_points, bool rect_profile);
 void calc_line_overlap2(double d_min, double d_max, double g_min, double g_max, double gratio_min, double gratio_max, double dx_min, double dx_max, 
-    int point_nb_per_order, int nb_dx_points);
+    int point_nb_per_order, int nb_dx_points, bool rect_profile);
 
 // both min and max values must be positive,
 int init_log_grid(double*& arr, double min_val, double max_val, double nb_points_bin)
@@ -104,12 +105,16 @@ int main(int argc, char** argv)
 	}
 #endif
 
+    bool rect_profile;
     int point_nb_per_order, nb_dx_points;
     double g_min, g_max, d_min, d_max, gratio_min, gratio_max, dx_min, dx_max;
 //	calc_loss_func_p(g_min = 1.e-6, g_max = 1.e+14, d_min = 1.e-2, d_max = 1.e+9, point_nb_per_order = 16);
 //	calc_loss_func_q(g_min = 1.e-6, g_max = 1.e+14, d_min = 1.e-2, d_max = 1.e+9, point_nb_per_order = 16);
-    calc_line_overlap1(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., point_nb_per_order = 8, nb_dx_points = 33);
-    calc_line_overlap2(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., point_nb_per_order = 8, nb_dx_points = 33);
+    calc_line_overlap1(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., 
+        point_nb_per_order = 8, nb_dx_points = 33, rect_profile = false);
+    
+    calc_line_overlap2(d_min = 1.e+2, d_max = 1.e+6, g_min = 1.e-6, g_max = 1.e+6, gratio_min = 0.01, gratio_max = 100., dx_min = -4., dx_max = 4., 
+        point_nb_per_order = 8, nb_dx_points = 33, rect_profile = false);
 
 	return 0;
 }
@@ -310,7 +315,7 @@ void calc_loss_func_q(double g_min, double g_max, double d_min, double d_max, in
 }
 
 void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, double gratio_min, double gratio_max, double dx_min, double dx_max, 
-    int point_nb_per_order, int nb_dx_points)
+    int point_nb_per_order, int nb_dx_points, bool rect_profile)
 {
     int i, j, k, l, m, nb_g, nb_gr, nb_d;
     double* gamma_arr, * gratio_arr, *dx_arr, *delta_arr;
@@ -344,7 +349,7 @@ void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, 
     cout << scientific;
     cout.precision(4);
 
-    // Initialization of gamma array
+    // Initialization of gamma array, 
     nb_g1 = init_log_grid(g1_arr, g_min, 1.e-2, 2);
     nb_g2 = init_log_grid(g2_arr, 1.e-2, 1.e-1, 4);
     nb_g3 = init_log_grid(g3_arr, 1.e-1, g_max, point_nb_per_order);
@@ -352,7 +357,7 @@ void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, 
     nb_g = nb_g1 + nb_g2 + nb_g3 - 2;
     gamma_arr = new double [nb_g];
     
-    memcpy(gamma_arr, g1_arr, nb_g1*sizeof(double));
+    memcpy(gamma_arr, g1_arr, nb_g1 * sizeof(double));
     memcpy(gamma_arr + nb_g1 - 1, g2_arr, nb_g2 * sizeof(double));
     memcpy(gamma_arr + nb_g1 + nb_g2 - 2, g3_arr, nb_g3 * sizeof(double));
   
@@ -410,11 +415,14 @@ void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, 
                     j = m % nb_g;
                     
                     // one sided loss probability function for photon created in line processes is 0.5-0.5*K, where K is p1
-                    calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
-                    //p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
-                    
-                    calc_p_rect.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
-                    p1[i][j] = qromb<line_overlap_rect1>(calc_p_rect, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
+                    if (rect_profile) {
+                        calc_p_rect.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                        p1[i][j] = qromb<line_overlap_rect1>(calc_p_rect, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
+                    }
+                    else {
+                        calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                        p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
+                    }              
                 }
 #pragma omp critical
                 {
@@ -449,11 +457,12 @@ void calc_line_overlap1(double d_min, double d_max, double g_min, double g_max, 
     delete[] delta_arr;
     delete[] gamma_arr;
     delete[] gratio_arr;
+    delete[] dx_arr;
     free_2d_array(p_arr);
 }
 
 void calc_line_overlap2(double d_min, double d_max, double g_min, double g_max, double gratio_min, double gratio_max, double dx_min, double dx_max, 
-    int point_nb_per_order, int nb_dx_points)
+    int point_nb_per_order, int nb_dx_points, bool rect_profile)
 {
     int i, j, k, l, m, nb_g, nb_gr, nb_d;
     double* gamma_arr, * gratio_arr, * dx_arr, *delta_arr;
@@ -538,12 +547,15 @@ void calc_line_overlap2(double d_min, double d_max, double g_min, double g_max, 
                     j = m % nb_g;
 
                     // Note!!! The correction was made - 1/g2 instead of 1./g1
-                    // one sided loss probability function for photon created in line processes is 0.5-0.5*K, where K is
-                    calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
-                    //p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / (gamma_arr[j] * gratio_arr[i]);
-
-                    calc_p_rect.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
-                    p1[i][j] = qromb<line_overlap_rect2>(calc_p_rect, MU_MIN, 1., 1.e-5, false) / gamma_arr[j];
+                    // one sided loss probability function for photon created in line processes is 0.5-0.5*K, where K is 
+                    if (rect_profile) {
+                        calc_p_rect.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                        p1[i][j] = qromb<line_overlap_rect2>(calc_p_rect, MU_MIN, 1., 1.e-5, false) / (gamma_arr[j] * gratio_arr[i]);
+                    }
+                    else {
+                        calc_p.set_parameters(delta_arr[l], gamma_arr[j], gamma_arr[j] * gratio_arr[i], dx_arr[k]);
+                        p1[i][j] = qromb<line_overlap_func_mu>(calc_p, MU_MIN, 1., 1.e-5, false) / (gamma_arr[j] * gratio_arr[i]);
+                    }
                 }
 #pragma omp critical
                 {
@@ -555,6 +567,7 @@ void calc_line_overlap2(double d_min, double d_max, double g_min, double g_max, 
                 }
                 delete f1;
                 delete f2;
+                delete lprofile;
                 free_2d_array(p1);
             }
             output << left << setw(12) << delta_arr[l] << setw(12) << dx_arr[k] << endl;
@@ -573,6 +586,7 @@ void calc_line_overlap2(double d_min, double d_max, double g_min, double g_max, 
     delete[] delta_arr;
     delete[] gamma_arr;
     delete[] gratio_arr;
+    delete[] dx_arr;
     free_2d_array(p_arr);
 }
 

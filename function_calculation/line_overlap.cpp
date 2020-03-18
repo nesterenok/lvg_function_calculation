@@ -42,9 +42,8 @@ void line_overlap_func2::set_x1(double x) {
 }
 
 
-line_overlap_func1::line_overlap_func1(double ta, bool v)
-    : tau(ta), verbosity(v), d(0.), b(0.), g1(0.), g2(0.), dx(0.), mu(0.), gz1(0.), gz2(0.), t(0.), 
-    lprofile(0), func2(0)
+line_overlap_func1::line_overlap_func1(bool v)
+    : verbosity(v), d(0.), b(0.), g1(0.), g2(0.), dx(0.), mu(0.), gz1(0.), gz2(0.), t(0.), lprofile(0), func2(0)
 {;}
 
 void line_overlap_func1::set_line_profile(line_profile* lp) {
@@ -54,10 +53,7 @@ void line_overlap_func1::set_line_profile(line_profile* lp) {
 double line_overlap_func1::operator() (double x1)
 {
     func2->set_x1(x1);
-    t = tau * mu; // is auxiliary variable, is not defined by default (tau < 0)
-
-    if (x1 + t > lprofile->x_max || t < DBL_EPSILON)
-        t = lprofile->x_max - x1;
+    t = lprofile->x_max - x1;
     
     if (t < 0.)
         t = 0.;
@@ -89,7 +85,7 @@ void line_overlap_func1::set_parameters(double dd, double gg1, double gg2, doubl
 }
 
 
-line_overlap_sf1::line_overlap_sf1(double t, bool v) : line_overlap_func1(t, v) 
+line_overlap_sf1::line_overlap_sf1(bool v) : line_overlap_func1(v) 
 {;}
 
 double line_overlap_sf1::operator() (double x1) 
@@ -104,7 +100,7 @@ double line_overlap_sf1::operator() (double x1)
 }
 
 
-line_overlap_sf2::line_overlap_sf2(double t, bool v) : line_overlap_func1(t, v) 
+line_overlap_sf2::line_overlap_sf2(bool v) : line_overlap_func1(v) 
 {;}
 
 double line_overlap_sf2::operator()(double x1) 
@@ -145,6 +141,7 @@ void line_overlap_func_mu::set_integr_lim(double a, double b) {
     x1_max = b;
 }
 
+
 // Rectangular profile
 line_overlap_rect::line_overlap_rect() : d(0.), g1(0.), g2(0.), dx(0.) {
     lprofile = new line_profile_rectang();
@@ -181,7 +178,8 @@ double line_overlap_rect1::operator()(double mu)
     }
     else {
         answ = -(1. - exp(-a * 2. * lprofile->eq_semiwidth)) / (a * a) + 2. * lprofile->eq_semiwidth / a;
-    }  
+    } 
+    // gamma is outside the integral
     return answ * lprofile->eq_height * lprofile->eq_height / (mu * mu);
 }
 
@@ -224,5 +222,6 @@ double line_overlap_rect2::operator()(double mu)
                 *exp(zd * (2. * lprofile->eq_semiwidth + dx)) / (a * c);
         }
     }
+    // gamma is outside the integral
     return answ * lprofile->eq_height * lprofile->eq_height / (mu * mu);
 }

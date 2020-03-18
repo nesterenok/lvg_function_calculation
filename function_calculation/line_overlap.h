@@ -3,7 +3,7 @@
 
 // J1 = S1 *K11 + S2 * K12
 // it is assumed that dx = (frequency_1 - frequency_2) / d_freq_doppler, difference between frequency_1 and frequency_2 (except dx) is omitted,
-// gz1 and gz2 (or velocity gradient) are positive, lower opacity - larger g or d, 
+// gz1 and gz2 (or velocity gradient) are assumed to be positive, lower opacity - larger g or d, 
 class line_overlap_func2
 {
 public:
@@ -30,7 +30,7 @@ class line_overlap_func1
 {
 public:
     bool verbosity;
-    double d, b, g1, g2, dx, mu, gz1, gz2, t, tau;
+    double d, b, g1, g2, dx, mu, gz1, gz2, t;
     
     line_profile* lprofile;
     line_overlap_func2* func2;
@@ -41,28 +41,27 @@ public:
     void set_mu(double m);
 
     virtual double operator() (double x1);
-
-    // tau is gamma*k_L*z = dv/dz *z/v_th, z is length of the region in question;
-    line_overlap_func1(double ta, bool v);
+    line_overlap_func1(bool v);
 };
 
-// the first integral on x2
+// the first integral on x2, calculation of K11
 // 1./sqrt(pi) exp(-x1*x1) *\int_{x1}^{x1+tau*mu} dx2 func2(x2)
 class line_overlap_sf1 : public line_overlap_func1
 {
 public:
     double operator() (double x1);
-    line_overlap_sf1(double t = -1, bool v = false);
+    line_overlap_sf1(bool v = false);
 };
 
+// calculation of K12
 class line_overlap_sf2 : public line_overlap_func1
 {
 public:
     double operator() (double x1);
-    line_overlap_sf2(double t = -1, bool v = false);
+    line_overlap_sf2(bool v = false);
 };
 
-// Integral on x1, 1/(mu*mu) *\int_{-\infty}^{\infty} dx1 func1(x1)
+// integral on x1, 1/(mu*mu) *\int_{-\infty}^{\infty} dx1 func1(x1)
 class line_overlap_func_mu
 {
 public:
@@ -79,7 +78,8 @@ public:
     line_overlap_func_mu(bool v = false);
 };
 
-// There is distinct class for rectangular profile,
+
+// there is distinct class for rectangular profile,
 class line_overlap_rect 
 {
 public:
@@ -101,4 +101,3 @@ class line_overlap_rect2 : public line_overlap_rect
 public:
     double operator() (double mu);
 };
-

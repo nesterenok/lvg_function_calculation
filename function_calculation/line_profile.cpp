@@ -61,4 +61,3 @@ double line_profile_rectang::integral(double x) {
     else 
         return 1.;
 }
-
